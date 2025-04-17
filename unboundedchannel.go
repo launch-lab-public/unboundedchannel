@@ -2,28 +2,29 @@ package unboundedchannel
 
 import "context"
 
-// Unbounded channel
-// Returns two channels, in and out
-// Writing into in buffers data into a slice
-// Reading from out reads from the buffer or blocks if no data is available
-//
-// Input channel must be closed and output channel must be drained
-// after use for resources to be released
-// Out channel is closed after in has been closed an buffer emptied
+// New returns a pair of channels (in, out) that implement an unbounded FIFO using a slice as the buffer.
+// Writes to in never block; reads from out block only if the buffer is empty and in is not closed.
+// The caller must close in to eventually close out, and must drain out to fully release resources.
+// Failing to close in or drain out after closing in leaks a goroutine.
 func New[T any]() (chan<- T, <-chan T) {
 	return NewWithContext[T](context.Background())
 }
 
-// With context
-// When writing messages to in, remember to check that the context is not done
-// This can be done for example like this:
-// ```
-// select {
-// case in <- msg:
-//     // Write success
-// case <-ctx.Done():
-//     // Write dropped
-// }
+// NewWithContext returns a pair of channels (in, out) that implement an unbounded FIFO using a slice as the buffer.
+// Writes to in never block (unless context is done); reads from out block only if the buffer is empty and in is not closed.
+// The provided ctx is used to cancel any pending operations and terminate buffering early.
+// The caller must either cancel the context or close in to eventually close out, and must drain out to fully release resources.
+// Failing to close the context or failing to either close in or drain out leaks a goroutine.
+//
+// When writing messages to in, callers should select on ctx.Done() to avoid
+// blocking after cancellation. For example:
+//
+//	select {
+//	case in <- msg:
+//	    // Write succeeded
+//	case <-ctx.Done():
+//	    // Write dropped due to context cancellation
+//	}
 func NewWithContext[T any](ctx context.Context) (chan<- T, <-chan T) {
 	in := make(chan T)
 	out := make(chan T)
