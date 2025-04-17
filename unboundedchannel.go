@@ -61,6 +61,7 @@ loop:
 
 					buffer = append(buffer, t)
 				case out <- buffer[0]:
+					buffer[0] = *new(T)
 					buffer = buffer[1:]
 				case <-ctx.Done():
 					return
